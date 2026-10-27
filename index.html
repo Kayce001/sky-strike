@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>星际突击 · 打飞机</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#060c19;color:#eaf5ff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;background-image:radial-gradient(ellipse at 20% 0%,#163452 0%,transparent 55%)}.layout{width:min(100%,1000px);display:grid;grid-template-columns:1fr 420px;gap:64px;align-items:center}.tag{font-size:12px;letter-spacing:4px;color:#67e8f9}h1{font-size:58px;letter-spacing:-3px;line-height:1.1;margin:20px 0}h1 span{color:#67e8f9}.desc{color:#90a5be;line-height:1.9;font-size:15px}.keys{margin-top:35px;display:grid;gap:15px;font-size:13px;color:#a9bdd2}kbd{display:inline-block;min-width:32px;border:1px solid #30465f;border-bottom-width:3px;background:#132237;border-radius:6px;padding:5px 8px;color:white;text-align:center;margin-right:6px}.foot{margin-top:42px;font-size:12px;color:#526c87}.game{position:relative;border:1px solid #2b4660;border-radius:22px;overflow:hidden;background:#080f20;box-shadow:0 25px 90px #0008;width:100%;aspect-ratio:420/680;touch-action:none;user-select:none}canvas{display:block;width:100%;height:100%}.hud{position:absolute;inset:20px 20px auto;display:flex;justify-content:space-between;pointer-events:none}.label{font-size:10px;letter-spacing:2px;color:#8199b5}.score{font-size:27px;font-weight:800;font-variant-numeric:tabular-nums}.right{text-align:right}.lives{color:#fb7185;font-size:20px;letter-spacing:3px;margin-top:3px}.pause{position:absolute;right:16px;bottom:16px;background:#12243bd9;color:#b7d8ef;border:1px solid #30465f;border-radius:9px;padding:9px 12px;cursor:pointer}.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#050b18aa;backdrop-filter:blur(5px);text-align:center;padding:25px}.overlay.hidden{display:none}.panel{width:100%}.badge{font-size:42px;margin-bottom:16px}.panel h2{font-size:30px;margin:8px 0}.panel p{color:#a4bad0;font-size:14px;line-height:1.8;white-space:pre-line}.start{border:0;border-radius:12px;background:#67e8f9;color:#052332;font-size:16px;font-weight:800;padding:15px 44px;cursor:pointer;box-shadow:0 0 30px #67e8f92a;margin-top:18px}.start:hover{background:#a5f3fc}.best{margin-top:20px;font-size:12px;color:#7996b3}.hint{position:absolute;bottom:22px;left:18px;font-size:10px;letter-spacing:1px;color:#58728e;pointer-events:none}@media(max-width:760px){body{padding:12px}.layout{display:block;max-width:420px}.intro{display:none}.game{max-height:calc(100dvh - 24px);width:auto;max-width:100%;margin:auto;aspect-ratio:420/680}}@media(prefers-reduced-motion:reduce){.start{box-shadow:none}}
+</style>
+</head>
+<body>
+<main class="layout">
+<section class="intro"><div class="tag">ARCADE / 01 · SPACE DEFENDER</div><h1>星际<span>突击</span></h1><p class="desc">引擎就绪，星空在前。<br>穿越敌机的火线，守住最后一道防线。<br>一局几分钟，看看你能飞多远。</p><div class="keys"><div><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 WASD 移动</div><div><kbd>P</kbd> 暂停 / 继续 · 自动射击</div><div>🖱 鼠标按住拖动 · 📱 手指拖动</div><div>✚ 维修补给　⚡ 双发强化（8 秒）</div></div><div class="foot">无需下载 · 无外部资源 · 最高分保存在本机</div></section>
+<section class="game" aria-label="打飞机游戏区域"><canvas id="game" width="420" height="680" aria-label="使用方向键或拖动飞机进行游戏"></canvas><div class="hud"><div><div class="label">SCORE</div><div class="score" id="score">000000</div></div><div class="right"><div class="label" id="level">LEVEL 01</div><div class="lives" id="lives">♥♥♥</div></div></div><div class="hint" id="hint">AUTO FIRE · 自动射击</div><button class="pause" id="pause" aria-label="暂停游戏" hidden>Ⅱ 暂停</button><div class="overlay" id="overlay"><div class="panel"><div class="badge" id="badge">✦</div><h2 id="title">准备起飞</h2><p id="message">躲避敌机与子弹，收集补给。
+飞机会自动开火，你只需要专心飞行。</p><button class="start" id="start">开始任务 →</button><div class="best" id="best">最高分 · 0</div></div></div></section>
+</main>
+<script>
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const ui=Object.fromEntries(['score','level','lives','hint','pause','overlay','badge','title','message','start','best'].map(id=>[id,document.getElementById(id)]));
+const W=420,H=680,keys=new Set();let state='ready',score=0,best=0,time=0,spawn=0,fire=0,last=0,level=1,pointer=null;
+let enemies=[],bullets=[],shots=[],particles=[],drops=[],player;
+try{best=Number(localStorage.getItem('sky-strike-best'))||0;}catch(e){}
+ui.best.textContent='最高分 · '+best;
+const rand=(a,b)=>a+Math.random()*(b-a),clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const stars=Array.from({length:85},()=>({x:rand(0,W),y:rand(0,H),s:rand(.6,2),v:rand(15,65)}));
+function reset(){score=0;time=0;spawn=.6;fire=0;level=1;enemies=[];bullets=[];shots=[];particles=[];drops=[];keys.clear();pointer=null;player={x:W/2,y:H-100,r:13,hp:3,inv:1.5,power:0};state='playing';ui.overlay.classList.add('hidden');ui.pause.hidden=false;ui.pause.textContent='Ⅱ 暂停';ui.pause.setAttribute('aria-label','暂停游戏');hud();}
+function hud(){ui.score.textContent=String(score).padStart(6,'0');ui.level.textContent='LEVEL '+String(level).padStart(2,'0');ui.lives.textContent='♥'.repeat(player?.hp??3);ui.hint.textContent=player?.power>0?'⚡ 双发强化 '+Math.ceil(player.power)+'s':'AUTO FIRE · 自动射击';}
+function show(title,message,button,badge){ui.title.textContent=title;ui.message.textContent=message;ui.start.textContent=button;ui.badge.textContent=badge;ui.best.textContent='最高分 · '+best;ui.overlay.classList.remove('hidden');}
+function pause(){if(state==='playing'){state='paused';keys.clear();pointer=null;show('任务暂停','休息一下，星空等你回来。','继续任务 →','Ⅱ');ui.pause.textContent='▶ 继续';ui.pause.setAttribute('aria-label','继续游戏');}else if(state==='paused'){state='playing';ui.overlay.classList.add('hidden');ui.pause.textContent='Ⅱ 暂停';ui.pause.setAttribute('aria-label','暂停游戏');}}
+ui.start.onclick=()=>state==='paused'?pause():reset();ui.pause.onclick=pause;
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();const k=e.key.toLowerCase();keys.add(k);if(k==='p'&&!e.repeat)pause();if((k==='enter'||k===' ')&&state!=='playing'&&!e.repeat)ui.start.click();});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();if(state==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')pause();});
+function locate(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+canvas.addEventListener('pointerdown',e=>{if(state!=='playing'||pointer)return;const p=locate(e);pointer={id:e.pointerId,x:p.x,y:p.y};canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(!pointer||pointer.id!==e.pointerId||state!=='playing')return;const p=locate(e);player.x=clamp(player.x+p.x-pointer.x,20,W-20);player.y=clamp(player.y+p.y-pointer.y,80,H-25);pointer={id:e.pointerId,...p};});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(type,e=>{if(pointer?.id===e.pointerId)pointer=null;});
+function burst(x,y,color,n=15){for(let i=0;i<n;i++){let a=rand(0,Math.PI*2),v=rand(30,160);particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(.2,.6),color});}}
+function hit(){if(player.inv>0||state!=='playing')return;player.hp--;player.inv=1.5;burst(player.x,player.y,'#67e8f9',20);if(player.hp<=0){state='over';ui.pause.hidden=true;pointer=null;best=Math.max(best,score);try{localStorage.setItem('sky-strike-best',best);}catch(e){}show('任务结束','本次得分 '+score+'\n整备完毕，再来一次？','再次出击 →','✧');}hud();}
+function collide(a,b){return Math.hypot(a.x-b.x,a.y-b.y)<a.r+b.r;}
+function update(dt){time+=dt;level=1+Math.floor(time/18);player.inv=Math.max(0,player.inv-dt);player.power=Math.max(0,player.power-dt);
+let dx=Number(keys.has('arrowright')||keys.has('d'))-Number(keys.has('arrowleft')||keys.has('a')),dy=Number(keys.has('arrowdown')||keys.has('s'))-Number(keys.has('arrowup')||keys.has('w'));const norm=Math.hypot(dx,dy)||1;player.x=clamp(player.x+dx/norm*300*dt,20,W-20);player.y=clamp(player.y+dy/norm*300*dt,80,H-25);
+fire-=dt;if(fire<=0){fire=.14;for(const offset of player.power>0?[-11,11]:[0])bullets.push({x:player.x+offset,y:player.y-22,r:4});}
+spawn-=dt;if(spawn<=0){spawn=Math.max(.25,.85-level*.045);let heavy=Math.random()<.22;enemies.push({x:rand(28,W-28),y:-35,r:heavy?23:16,hp:heavy?5:2,heavy,speed:rand(65,105)+Math.min(level,20)*8,phase:rand(0,7),fire:rand(1.2,2.6),dead:false});}
+for(const b of bullets)b.y-=520*dt;
+for(const e of enemies){e.y+=e.speed*dt;e.x=clamp(e.x+Math.sin(time*2+e.phase)*22*dt,25,W-25);e.fire-=dt;if(e.fire<=0&&e.y>25&&e.y<H-180){e.fire=rand(1.8,3);const a=Math.atan2(player.y-e.y,player.x-e.x);shots.push({x:e.x,y:e.y+15,r:5,vx:Math.cos(a)*150,vy:Math.sin(a)*150});}for(const b of bullets){if(!b.dead&&!e.dead&&collide(b,e)){b.dead=true;e.hp--;burst(b.x,b.y,'#fde68a',3);if(e.hp<=0){e.dead=true;score+=e.heavy?50:20;burst(e.x,e.y,e.heavy?'#fb923c':'#fb7185',22);if(Math.random()<.16)drops.push({x:e.x,y:e.y,r:12,type:Math.random()<.5?'heal':'power'});}}}if(!e.dead&&collide(e,player)){e.dead=true;burst(e.x,e.y,'#fb7185');hit();}}
+for(const b of shots){b.x+=b.vx*dt;b.y+=b.vy*dt;if(collide(b,player)){b.dead=true;hit();}}
+for(const d of drops){d.y+=90*dt;if(collide(d,player)){d.dead=true;if(d.type==='heal')player.hp=Math.min(3,player.hp+1);else player.power=8;burst(d.x,d.y,'#6ee7b7');}}
+for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;}
+bullets=bullets.filter(b=>!b.dead&&b.y>-20);enemies=enemies.filter(e=>!e.dead&&e.y<H+40);shots=shots.filter(b=>!b.dead&&b.y<H+20&&b.y>-30&&b.x>-20&&b.x<W+20);drops=drops.filter(d=>!d.dead&&d.y<H+20);particles=particles.filter(p=>p.life>0);hud();}
+function plane(x,y,size,color,enemy=false){ctx.save();ctx.translate(x,y);if(enemy)ctx.rotate(Math.PI);ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(0,-size*1.4);ctx.lineTo(size*.38,-size*.15);ctx.lineTo(size,size*.65);ctx.lineTo(size*.9,size);ctx.lineTo(size*.22,size*.6);ctx.lineTo(0,size*.9);ctx.lineTo(-size*.22,size*.6);ctx.lineTo(-size*.9,size);ctx.lineTo(-size,size*.65);ctx.lineTo(-size*.38,-size*.15);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=enemy?'#5e2037':'#0b5369';ctx.fillRect(-3,-size*.5,6,size*.8);if(!enemy){ctx.fillStyle='#d6fbff';ctx.beginPath();ctx.moveTo(-4,size*.8);ctx.lineTo(0,size*(1.25+Math.random()*.5));ctx.lineTo(4,size*.8);ctx.fill();}ctx.restore();}
+function draw(dt){ctx.clearRect(0,0,W,H);ctx.fillStyle='#080f20';ctx.fillRect(0,0,W,H);for(const s of stars){if(state==='playing'||state==='ready')s.y=(s.y+s.v*dt)%H;ctx.globalAlpha=s.s/2.5;ctx.fillStyle='#a0c5e7';ctx.fillRect(s.x,s.y,s.s,s.s);}ctx.globalAlpha=1;
+ctx.strokeStyle='#20334a44';ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+for(const d of drops){ctx.fillStyle=d.type==='heal'?'#6ee7b7':'#fcd34d';ctx.beginPath();ctx.arc(d.x,d.y,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#082231';ctx.textAlign='center';ctx.font='bold 16px sans-serif';ctx.fillText(d.type==='heal'?'+':'ϟ',d.x,d.y+6);}
+ctx.shadowBlur=10;ctx.shadowColor='#67e8f9';ctx.fillStyle='#a5f3fc';for(const b of bullets)ctx.fillRect(b.x-2,b.y-9,4,15);ctx.shadowColor='#fb923c';ctx.fillStyle='#fb923c';for(const b of shots){ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();}ctx.shadowBlur=0;
+for(const e of enemies)plane(e.x,e.y,e.r,e.heavy?'#fb923c':'#fb7185',true);
+if(player&&state!=='over'){if(player.inv<=0||Math.floor(player.inv*12)%2===0)plane(player.x,player.y,18,'#67e8f9');if(player.inv>0){ctx.strokeStyle='#67e8f966';ctx.beginPath();ctx.arc(player.x,player.y,29,0,Math.PI*2);ctx.stroke();}}
+for(const p of particles){ctx.globalAlpha=Math.min(1,p.life*3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);}ctx.globalAlpha=1;}
+function frame(now){const dt=Math.min((now-last)/1000,.04);last=now;if(state==='playing')update(dt);draw(dt);requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script>
+</body>
+</html>
