@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "sky-strike-stats",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-27",
+  "workers_dev": true,
+  "vars": {"ALLOWED_ORIGIN": "https://example.github.io"},
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "sky-strike-stats",
+    "database_id": "YOUR_DATABASE_ID"
+  }]
+}
