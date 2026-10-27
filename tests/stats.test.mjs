@@ -106,3 +106,30 @@ test('storage denied uses a session-only identity without throwing', async () =>
   assert.equal(c.playerId,player1);
   assert.doesNotThrow(()=>c.sync());
 });
+test('a delayed online response cannot overwrite a newer pause response', async () => {
+  let playing=true;
+  const pending=[], output=[];
+  const client=new PlayerStats({endpoint:'https://test',isPlaying:()=>playing,
+    storage:{getItem:()=>player1},uuid:()=>session1,
+    fetcher:()=>new Promise(resolve=>pending.push(resolve)),render:data=>output.push(data),
+    clock:{setTimeout:()=>1,clearTimeout:()=>{}},
+  });
+  const first=client.sync();await Promise.resolve();
+  playing=false;
+  const pause=client.sync();await Promise.resolve();
+  pending[1](Response.json({totalPlayers:1,onlinePlayers:0}));await pause;
+  pending[0](Response.json({totalPlayers:1,onlinePlayers:1}));await first;
+  assert.deepEqual(output,[{totalPlayers:1,onlinePlayers:0}]);
+});
+test('corrupted stored identity is replaced, hidden pages do not keep polling', async () => {
+  let callback,requests=0,stored;
+  const client=new PlayerStats({endpoint:'https://test',isPlaying:()=>false,isVisible:()=>false,
+    storage:{getItem:()=>'-'.repeat(36),setItem:(key,value)=>stored=value},uuid:()=>player1,
+    fetcher:async()=>{requests++;return Response.json({totalPlayers:0,onlinePlayers:0});},render:()=>{},
+    clock:{setTimeout:()=>1,clearTimeout:()=>{},setInterval:fn=>{callback=fn;return 1;}},
+  });
+  client.start();await client.inFlight;
+  callback();await Promise.resolve();
+  assert.equal(stored,player1);
+  assert.equal(requests,1);
+});

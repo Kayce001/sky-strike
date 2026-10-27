@@ -1,6 +1,6 @@
 export class PlayerStats {
-  constructor({endpoint, isPlaying, storage, uuid, fetcher, render, beacon, clock = globalThis}) {
-    Object.assign(this, {endpoint:endpoint.replace(/\/$/, ''), isPlaying, fetcher, render, beacon, clock});
+  constructor({endpoint, isPlaying, storage, uuid, fetcher, render, beacon, isVisible = () => true, clock = globalThis}) {
+    Object.assign(this, {endpoint:endpoint.replace(/\/$/, ''), isPlaying, fetcher, render, beacon, isVisible, clock});
     this.sequence = 0;
     this.sessionId = uuid();
     try {
@@ -19,7 +19,7 @@ export class PlayerStats {
     if (this.started) return;
     this.started = true;
     this.sync();
-    this.timer = this.clock.setInterval(() => this.sync(), 15000);
+    this.timer = this.clock.setInterval(() => { if (this.isVisible()) this.sync(); }, 15000);
   }
   payload(active) {
     return {playerId:this.playerId, sessionId:this.sessionId, sequence:++this.sequence, active};
@@ -76,6 +76,7 @@ if (typeof document !== 'undefined') {
   const stats = new PlayerStats({
     endpoint,
     isPlaying:() => window.skyStrikeIsPlaying() && !document.hidden,
+    isVisible:() => !document.hidden,
     storage:{getItem:key => localStorage.getItem(key), setItem:(key, value) => localStorage.setItem(key,value)},
     uuid:() => crypto.randomUUID(), fetcher:(...args) => fetch(...args),
     beacon:(...args) => navigator.sendBeacon(...args),
